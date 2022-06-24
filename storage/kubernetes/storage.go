@@ -40,6 +40,10 @@ const (
 	resourceDeviceToken     = "devicetokens"
 )
 
+const (
+	gcResultLimit = 500
+)
+
 // Config values for the Kubernetes storage type.
 type Config struct {
 	InCluster      bool   `json:"inCluster"`
@@ -599,7 +603,7 @@ func (cli *client) UpdateConnector(id string, updater func(a storage.Connector) 
 
 func (cli *client) GarbageCollect(now time.Time) (result storage.GCResult, err error) {
 	var authRequests AuthRequestList
-	if err := cli.list(resourceAuthRequest, &authRequests); err != nil {
+	if err := cli.listN(resourceAuthRequest, &authRequests, gcResultLimit); err != nil {
 		return result, fmt.Errorf("failed to list auth requests: %v", err)
 	}
 
@@ -618,7 +622,7 @@ func (cli *client) GarbageCollect(now time.Time) (result storage.GCResult, err e
 	}
 
 	var authCodes AuthCodeList
-	if err := cli.list(resourceAuthCode, &authCodes); err != nil {
+	if err := cli.listN(resourceAuthCode, &authCodes, gcResultLimit); err != nil {
 		return result, fmt.Errorf("failed to list auth codes: %v", err)
 	}
 
@@ -633,7 +637,7 @@ func (cli *client) GarbageCollect(now time.Time) (result storage.GCResult, err e
 	}
 
 	var deviceRequests DeviceRequestList
-	if err := cli.list(resourceDeviceRequest, &deviceRequests); err != nil {
+	if err := cli.listN(resourceDeviceRequest, &deviceRequests, gcResultLimit); err != nil {
 		return result, fmt.Errorf("failed to list device requests: %v", err)
 	}
 
@@ -648,7 +652,7 @@ func (cli *client) GarbageCollect(now time.Time) (result storage.GCResult, err e
 	}
 
 	var deviceTokens DeviceTokenList
-	if err := cli.list(resourceDeviceToken, &deviceTokens); err != nil {
+	if err := cli.listN(resourceDeviceToken, &deviceTokens, gcResultLimit); err != nil {
 		return result, fmt.Errorf("failed to list device tokens: %v", err)
 	}
 
@@ -740,13 +744,14 @@ func retryOnConflict(ctx context.Context, action func() error) error {
 	for {
 		select {
 		case <-time.After(getNextStep()):
-			if err := action(); err == nil || !isKubernetesAPIConflictError(err) {
+			err := action()
+			if err == nil || !isKubernetesAPIConflictError(err) {
 				return err
 			}
 
 			attempts++
 			if attempts >= 4 {
-				return errors.New("maximum timeout reached while retrying a conflicted request")
+				return fmt.Errorf("maximum timeout reached while retrying a conflicted request: %w", err)
 			}
 		case <-ctx.Done():
 			return errors.New("canceled")
