@@ -27,8 +27,8 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: |
-            ghcr.io/dexidp/dex
-            dexidp/dex
+            ghcr.io/open-ch/dex
+            open-ch/dex
           flavor: |
             latest = false
           tags: |
@@ -85,7 +85,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.4.0
         with:
-          image-ref: "ghcr.io/dexidp/dex:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}"
+          image-ref: "ghcr.io/open-ch/dex:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}"
           format: "sarif"
           output: "trivy-results.sarif"
         if: github.event_name == 'push'
